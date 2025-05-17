@@ -1,30 +1,206 @@
+import 'package:desktop_code/style/color.dart';
+import 'package:desktop_code/style/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controller/text_receiver_controller.dart';
-import '../server/server.dart'; // 🔥 Also import server
+import '../server/server.dart';
 
 class HomeView extends StatelessWidget {
   HomeView({Key? key}) : super(key: key);
 
-  final TextReceiverController controller = Get.put(TextReceiverController()); // ✅ Correct
-
-  final Server server = Server(); // ✅ Start server inside app
+  final TextReceiverController controller = Get.put(TextReceiverController());
+  final Server server = Server();
+  final TextEditingController serialController = TextEditingController();
+  final TextEditingController imeiController = TextEditingController();
+  final TextEditingController macController = TextEditingController();
+  final TextEditingController ipAddController = TextEditingController();
+  final TextEditingController portController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
-    server.startServer(); // ✅ Server start karte hi
+    // server.startServer();
+    ever(controller.serial, (value) {
+      serialController.text = value;
+    });
+    ever(controller.imei, (value) {
+      imeiController.text = value;
+    });
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Desktop Receiver')),
-      body: Center(
-        child: Obx(() => Text(
-          controller.receivedText.value.isEmpty
-              ? 'Waiting for text...'
-              : controller.receivedText.value,
-          style: const TextStyle(fontSize: 24),
-          textAlign: TextAlign.center,
-        )),
+      backgroundColor: AppColors.white,
+      appBar: AppBar(
+        backgroundColor: AppColors.white,
+        title: Text('P12 Devices'),
+        titleTextStyle: TextStyle(
+          color: Colors.black,
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+        actions: [
+          Text(
+            "MsCorpres Automation  ",
+            style: AppTextStyles.kSmall8SemiBoldTextStyle.copyWith(
+              color: AppColors.primaryColor,
+            ),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Enter IP Address",
+                        style: AppTextStyles.kSmall6SemiBoldTextStyle.copyWith(color: AppColors.white60)),
+                    SizedBox(
+                      height: 33,
+                      width: 200,
+                      child: TextField(
+                        controller: ipAddController,
+                        decoration: InputDecoration(
+                          hintText: "Enter IP Address",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(
+                  width: 10,
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Port",
+                        style: AppTextStyles.kSmall6SemiBoldTextStyle.copyWith(color: AppColors.white60)),
+                    SizedBox(
+                      height: 33,
+                      width: 100,
+                      child: TextField(
+                        controller: portController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          hintText: "Enter Port",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(
+                  width: 10,
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("",
+                        style: AppTextStyles.kSmall6SemiBoldTextStyle.copyWith(color: AppColors.white60)),
+                    Container(
+                      height: 33,
+                      width: 80,
+                      decoration: BoxDecoration(
+                        color: AppColors.white40,
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: TextButton(
+                          onPressed: () {
+                            final ip = ipAddController.text.trim();
+                            final portStr = portController.text.trim();
+
+                            if (ip.isEmpty || portStr.isEmpty) {
+                              Get.snackbar("Error", "Please enter both IP and Port");
+                              return;
+                            }
+
+                            final port = int.tryParse(portStr);
+                            if (port == null) {
+                              Get.snackbar("Error", "Port must be a valid number");
+                              return;
+                            }
+                            server.startServer(ip, port);
+                            Get.snackbar("Success", "Server started at $ip:$port", backgroundColor: AppColors.success20);
+                          },
+                          child: Text("Start",
+                      style: TextStyle(color: AppColors.primaryColor),)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Serial Number
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Serial Number",
+                        style: AppTextStyles.kSmall6SemiBoldTextStyle),
+                    SizedBox(
+                      height: 35,
+                      width: 250,
+                      child: TextField(
+                        controller: serialController,
+                        decoration: InputDecoration(
+                          hintText: "Enter Serial Number",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                // IMEI
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("IMEI Number",
+                        style: AppTextStyles.kSmall6SemiBoldTextStyle),
+                    SizedBox(
+                      height: 35,
+                      width: 250,
+                      child: TextField(
+                        controller: imeiController,
+                        decoration: InputDecoration(
+                          hintText: "Enter IMEI Number",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                // MAC Address (optional / static)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Mac Address",
+                        style: AppTextStyles.kSmall6SemiBoldTextStyle),
+                    SizedBox(
+                      height: 35,
+                      width: 250,
+                      child: TextField(
+                        controller: macController,
+                        decoration: InputDecoration(
+                          hintText: "Enter Mac address",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+
