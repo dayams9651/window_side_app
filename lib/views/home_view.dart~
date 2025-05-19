@@ -209,7 +209,7 @@ class HomeView extends StatelessWidget {
                   height: 35,
                   width: 80,
                   child: RoundButton(
-                    color: AppColors.error40,
+                    color: AppColors.error20,
                       title: "Print", onTap: (){}),
                 )
               ],

@@ -9,13 +9,13 @@ class Server {
   final TextReceiverController controller = Get.find();
   Future<void> startServer(String ip, int port) async {
     final router = Router();
-
     router.post('/send-text', (shelf.Request request) async {
       final body = await request.readAsString();
       final data = Uri.splitQueryString(body);
       final imei = data['imei'] ?? '';
       final serial = data['serial'] ?? '';
-      final combined = 'IMEI: $imei\nSERIAL: $serial';
+      final macAdd = data['macAdd'] ?? '';
+      final combined = 'IMEI: $imei\nSERIAL: $serial\nMAC Address: $macAdd';
       controller.updateText(combined);
       return shelf.Response.ok('Received');
     });
