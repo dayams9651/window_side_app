@@ -1,44 +1,107 @@
-import 'package:desktop_code/common/widget/round_button.dart';
-import 'package:desktop_code/style/color.dart';
-import 'package:desktop_code/style/text_style.dart';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:barcode_widget/barcode_widget.dart';
+import 'package:usb_serial/usb_serial.dart';
+import '../common/widget/round_button.dart';
 import '../controller/text_receiver_controller.dart';
 import '../server/server.dart';
+import '../style/color.dart';
+import '../style/text_style.dart';
 
-class HomeView extends StatelessWidget {
+class HomeView extends StatefulWidget {
   HomeView({Key? key}) : super(key: key);
 
+  @override
+  State<HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends State<HomeView> {
   final TextReceiverController controller = Get.put(TextReceiverController());
   final Server server = Server();
+
   final TextEditingController serialController = TextEditingController();
   final TextEditingController imeiController = TextEditingController();
-  final TextEditingController macController = TextEditingController();
   final TextEditingController ipAddController = TextEditingController();
   final TextEditingController portController = TextEditingController();
 
+  Future<void> printBarcode(String serial) async {
+    UsbPort? port = await openPrinterPort();
+    if (port == null) return;
+    String tsplCommand = buildTsplCommand(serial);
+    Uint8List data = Uint8List.fromList(tsplCommand.codeUnits);
+    await port.write(data);
+    await port.close();
+    Get.snackbar('Success', 'Barcode sent to printer.');
+  }
+
+  String buildTsplCommand(String serial) {
+    return '''
+          SIZE 40 mm,30 mm
+          GAP 3 mm,0 mm
+          DIRECTION 0
+          CLS
+          BARCODE 100,50,"128",100,1,0,2,2,"$serial"
+          PRINT 1
+          ''';
+   }
+
+
+  Future<List<UsbDevice>> listUsbDevices() async {
+    return await UsbSerial.listDevices();
+  }
+
+  Future<UsbPort?> openPrinterPort() async {
+    List<UsbDevice> devices = await listUsbDevices();
+
+    if (devices.isEmpty) {
+      Get.snackbar('Error', 'No USB printer found.');
+      return null;
+    }
+
+    UsbDevice device = devices.first;
+    UsbPort? port = await device.create();
+
+    if (port == null) {
+      Get.snackbar('Error', 'Could not create port.');
+      return null;
+    }
+
+    bool? opened = await port.open();
+    if (opened != true) {
+      Get.snackbar('Error', 'Could not open port.');
+      return null;
+    }
+    return port;
+  }
+
+  bool showBarcode = false;
+
   @override
-  Widget build(BuildContext context) {
-    // server.startServer();
+  void initState() {
+    super.initState();
     ever(controller.serial, (value) {
       serialController.text = value;
     });
     ever(controller.imei, (value) {
       imeiController.text = value;
     });
-    ever(controller.macAdd, (value) {
-      macController.text = value;
-    });
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.white,
       appBar: AppBar(
+        automaticallyImplyLeading: true,
         backgroundColor: AppColors.white,
-        title: Text('P12 Devices'),
-        titleTextStyle: TextStyle(
-          color: Colors.black,
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
+        title: Text(
+          'P12 Devices',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         actions: [
           Text(
@@ -49,175 +112,297 @@ class HomeView extends StatelessWidget {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Enter IP Address",
-                        style: AppTextStyles.kSmall6SemiBoldTextStyle.copyWith(color: AppColors.white60)),
-                    SizedBox(
-                      height: 33,
-                      width: 200,
-                      child: TextField(
-                        controller: ipAddController,
-                        decoration: InputDecoration(
-                          hintText: "Enter IP Address",
-                          border: OutlineInputBorder(),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Enter IP Address",
+                        style: AppTextStyles.kSmall6SemiBoldTextStyle
+                            .copyWith(color: AppColors.white60),
+                      ),
+                      SizedBox(
+                        height: 33,
+                        width: 200,
+                        child: TextField(
+                          controller: ipAddController,
+                          decoration: InputDecoration(
+                            hintText: "Enter IP Address",
+                            border: OutlineInputBorder(),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                SizedBox(
-                  width: 10,
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Port",
-                        style: AppTextStyles.kSmall6SemiBoldTextStyle.copyWith(color: AppColors.white60)),
-                    SizedBox(
-                      height: 33,
-                      width: 100,
-                      child: TextField(
-                        controller: portController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          hintText: "Enter Port",
-                          border: OutlineInputBorder(),
+                    ],
+                  ),
+                  SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Port",
+                        style: AppTextStyles.kSmall6SemiBoldTextStyle
+                            .copyWith(color: AppColors.white60),
+                      ),
+                      SizedBox(
+                        height: 33,
+                        width: 100,
+                        child: TextField(
+                          controller: portController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: "Enter Port",
+                            border: OutlineInputBorder(),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                SizedBox(
-                  width: 10,
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("",
-                        style: AppTextStyles.kSmall6SemiBoldTextStyle.copyWith(color: AppColors.white60)),
-                    Container(
-                      height: 33,
-                      width: 80,
-                      decoration: BoxDecoration(
-                        color: AppColors.white40,
-                        borderRadius: BorderRadius.circular(5),
+                    ],
+                  ),
+                  SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "",
+                        style: AppTextStyles.kSmall6SemiBoldTextStyle
+                            .copyWith(color: AppColors.white60),
                       ),
-                      child: TextButton(
+                      Container(
+                        height: 33,
+                        width: 80,
+                        decoration: BoxDecoration(
+                          color: AppColors.white40,
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: TextButton(
                           onPressed: () {
                             final ip = ipAddController.text.trim();
                             final portStr = portController.text.trim();
 
                             if (ip.isEmpty || portStr.isEmpty) {
-                              Get.snackbar("Error", "Please enter both IP and Port");
+                              Get.defaultDialog(
+                                title: "Error",
+                                middleText: "Please enter both IP and Port",
+                                backgroundColor: AppColors.error20,
+                                titleStyle: AppTextStyles.kSmall6SemiBoldTextStyle
+                                    .copyWith(color: AppColors.white70),
+                                middleTextStyle: AppTextStyles.kSmall6SemiBoldTextStyle
+                                    .copyWith(color: AppColors.white70),
+                                radius: 10,
+                                confirm: ElevatedButton(
+                                  onPressed: () => Get.back(),
+                                  child: Text("OK"),
+                                ),
+                              );
                               return;
                             }
 
                             final port = int.tryParse(portStr);
                             if (port == null) {
-                              Get.snackbar("Error", "Port must be a valid number");
+                              Get.defaultDialog(
+                                title: "Error",
+                                middleText: "Port must be a number",
+                                backgroundColor: AppColors.error20,
+                                titleStyle: AppTextStyles.kSmall6SemiBoldTextStyle
+                                    .copyWith(color: AppColors.white70),
+                                middleTextStyle: AppTextStyles.kSmall6SemiBoldTextStyle
+                                    .copyWith(color: AppColors.white70),
+                                radius: 10,
+                                confirm: ElevatedButton(
+                                  onPressed: () => Get.back(),
+                                  child: Text("OK"),
+                                ),
+                              );
                               return;
                             }
+
                             server.startServer(ip, port);
-                            Get.snackbar("Success", "Server started at $ip:$port", backgroundColor: AppColors.success20);
+                            Get.defaultDialog(
+                              title: "Success",
+                              middleText: "Server started at $ip:$port",
+                              backgroundColor: AppColors.success20,
+                              titleStyle: AppTextStyles.kSmall6SemiBoldTextStyle
+                                  .copyWith(color: AppColors.white70),
+                              middleTextStyle: AppTextStyles.kSmall6SemiBoldTextStyle
+                                  .copyWith(color: AppColors.white70),
+                              radius: 10,
+                              confirm: ElevatedButton(
+                                onPressed: () => Get.back(),
+                                child: Text("OK"),
+                              ),
+                            );
                           },
-                          child: Text("Start",
-                      style: TextStyle(color: AppColors.primaryColor),)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Serial Number
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Serial Number",
-                        style: AppTextStyles.kSmall6SemiBoldTextStyle),
-                    SizedBox(
-                      height: 35,
-                      width: 250,
-                      child: TextField(
-                        controller: serialController,
-                        decoration: InputDecoration(
-                          hintText: "Enter Serial Number",
-                          border: OutlineInputBorder(),
+                          child: Text(
+                            "Start",
+                            style: TextStyle(color: AppColors.primaryColor),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("IMEI Number",
-                        style: AppTextStyles.kSmall6SemiBoldTextStyle),
-                    SizedBox(
-                      height: 35,
-                      width: 250,
-                      child: TextField(
-                        controller: imeiController,
-                        decoration: InputDecoration(
-                          hintText: "Enter IMEI Number",
-                          border: OutlineInputBorder(),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Row(
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Serial Number",
+                        style: AppTextStyles.kSmall6SemiBoldTextStyle,
+                      ),
+                      SizedBox(
+                        height: 35,
+                        width: 250,
+                        child: TextField(
+                          controller: serialController,
+                          decoration: InputDecoration(
+                            hintText: "Enter Serial Number",
+                            border: OutlineInputBorder(),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Mac Address",
-                        style: AppTextStyles.kSmall6SemiBoldTextStyle),
-                    SizedBox(
-                      height: 35,
-                      width: 250,
-                      child: TextField(
-                        controller: macController,
-                        decoration: InputDecoration(
-                          hintText: "Enter Mac address",
-                          border: OutlineInputBorder(),
+                    ],
+                  ),
+                  SizedBox(width: 20),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "IMEI Number",
+                        style: AppTextStyles.kSmall6SemiBoldTextStyle,
+                      ),
+                      SizedBox(
+                        height: 35,
+                        width: 250,
+                        child: TextField(
+                          controller: imeiController,
+                          decoration: InputDecoration(
+                            hintText: "Enter IMEI Number",
+                            border: OutlineInputBorder(),
+                          ),
                         ),
                       ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(7.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  SizedBox(
+                    height: 35,
+                    width: 80,
+                    child: RoundButton(
+                      color: AppColors.error20,
+                      title: "Print",
+                      onTap: () async {
+                        if (serialController.text.trim().isNotEmpty) {
+                          setState(() {
+                            showBarcode = true; // show barcode preview
+                          });
+
+                          await printBarcode(serialController.text.trim()); // send to printer
+                        } else {
+                          Get.snackbar('Error', 'Please enter Serial Number first');
+                        }
+                      },
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                  SizedBox(width: 10),
+                  Container(
+                    height: 35,
+                    width: 120,
+                    decoration: BoxDecoration(
+                      color: AppColors.white40,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: TextButton(onPressed: (){
+                      if (serialController.text.trim().isNotEmpty) {
+                        setState(() {
+                          showBarcode = true;
+                        });
+                      } else {
+                        Get.defaultDialog(
+                          title: "Error",
+                          middleText: "Please enter Serial and IMEI",
+                          backgroundColor: AppColors.error20,
+                          titleStyle: AppTextStyles.kSmall6SemiBoldTextStyle
+                              .copyWith(color: AppColors.white70),
+                          middleTextStyle: AppTextStyles.kSmall6SemiBoldTextStyle
+                              .copyWith(color: AppColors.white70),
+                          radius: 10,
+                          confirm: ElevatedButton(
+                            onPressed: () => Get.back(),
+                            child: Text("OK"),
+                          ),
+                        );
+                      }
+                    }, child: Row(
+                      children: [
+                        Icon(Icons.print, color: AppColors.white100,),
+                        SizedBox(width: 8),
+                        Text("Generate", style: TextStyle(fontWeight: FontWeight.bold),),
+                      ],
+                    )),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(7.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                SizedBox(
-                  height: 35,
-                  width: 80,
-                  child: RoundButton(
-                    color: AppColors.error40,
-                      title: "Print", onTap: (){}),
-                )
-              ],
-            ),
-          )
-        ],
+            if (showBarcode) ...[
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 18.0, bottom: 10),
+                    child: Text(
+                      "Generated Barcode",
+                      style: AppTextStyles.kSmall6SemiBoldTextStyle,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      SizedBox(width: 20),
+                      BarcodeWidget(
+                        barcode: Barcode.code128(),
+                        data: serialController.text.trim(),
+                        width: 190,
+                        height: 50,
+                        drawText: true,
+                      ),
+                      SizedBox(width: 20),
+                      BarcodeWidget(
+                        barcode: Barcode.code128(),
+                        data: imeiController.text.trim(),
+                        width: 190,
+                        height: 50,
+                        drawText: true,
+                      ),
+                    ],
+                  ),
+                ],
+              )
+
+            ],
+          ],
+        ),
       ),
     );
   }
-}
 
+  void printToTscPrinter(String serial, String imei) {
+    print('Printing serial: $serial, imei: $imei');
+  }
+}
